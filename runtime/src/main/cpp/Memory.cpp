@@ -2064,11 +2064,10 @@ NO_INLINE OBJ_GETTER(doInitSharedInstance,
 #else  // KONAN_NO_THREADS
 retry:
   if (*location != nullptr) {
-    ObjHeader* value = clearPointerBits(*location, UNINITIALIZED_TAG);
-    // If there's a frozen value already, just return it.
-    if (isPermanentOrFrozen(value)) {
-      RETURN_OBJ(value);
+    if (!hasPointerBits(*location, UNINITIALIZED_TAG)) {
+      RETURN_OBJ(*location);
     }
+    ObjHeader* value = clearPointerBits(*location, UNINITIALIZED_TAG);
 
     // If the value is being initialized by the current worker, just return it.
     auto it = memoryState->initializingSingletons.find(reinterpret_cast<uintptr_t>(value));
@@ -2077,7 +2076,13 @@ retry:
     }
 
     // Spin lock.
-    while (*location && !isPermanentOrFrozen(clearPointerBits(*location, UNINITIALIZED_TAG))) {}
+    while (true) {
+      ObjHeader* value = atomicGet(location);
+      if (value == nullptr)
+        break;
+      if (!hasPointerBits(value, UNINITIALIZED_TAG))
+        break;
+    }
 
     // If location has become empty or frozen, just retry the entire procedure.
     goto retry;
@@ -2105,10 +2110,9 @@ retry:
 #else  // KONAN_NO_EXCEPTIONS
   try {
     ctor(object);
-    // TODO: Move after Freeze.
-    *location = clearPointerBits(*location, UNINITIALIZED_TAG);
     if (Strict)
       FreezeSubgraph(object);
+    *location = clearPointerBits(*location, UNINITIALIZED_TAG);
     synchronize();
     // After freezing, we can forget value's initializer.
     memoryState->initializingSingletons.erase(it.first);
@@ -2136,9 +2140,9 @@ ALWAYS_INLINE OBJ_GETTER(initSharedInstance,
   RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);
 #else  // KONAN_NO_THREADS
   ObjHeader* value = *location;
-  // If there's a frozen value already, just return it.
-  if (value != nullptr && (reinterpret_cast<ContainerHeader*>(clearPointerBits(value, UNINITIALIZED_TAG)) - 1)->frozen()) {
-      RETURN_OBJ(value);
+  // If there's a ready value already, just return it.
+  if (value != nullptr && !hasPointerBits(value, UNINITIALIZED_TAG)) {
+    RETURN_OBJ(value);
   }
   RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);
 #endif  // KONAN_NO_THREADS
