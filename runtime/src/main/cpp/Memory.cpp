@@ -2102,7 +2102,7 @@ ALWAYS_INLINE OBJ_GETTER(initSharedInstance,
 #else  // KONAN_NO_THREADS
   ObjHeader* value = *location;
   // If there's a frozen value already, just return it.
-  if (value != nullptr && isPermanentOrFrozen(value)) {
+  if (value != nullptr && (reinterpret_cast<ContainerHeader*>(value) - 1)->frozen()) {
       RETURN_OBJ(value);
   }
   RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);
