@@ -509,7 +509,7 @@ MODEL_VARIANTS(void, UpdateStackRef, ObjHeader** location, const ObjHeader* obje
 // Updates heap/static data location.
 MODEL_VARIANTS(void, UpdateHeapRef, ObjHeader** location, const ObjHeader* object);
 // Updates location if it is null, atomically.
-bool UpdateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) RUNTIME_NOTHROW;
+void UpdateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) RUNTIME_NOTHROW;
 // Updates reference in return slot.
 MODEL_VARIANTS(void, UpdateReturnRef, ObjHeader** returnSlot, const ObjHeader* object);
 // Compares and swaps reference with taken lock.

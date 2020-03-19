@@ -1850,6 +1850,16 @@ void zeroHeapRef(ObjHeader** location) {
   }
 }
 
+void zeroHeapRefWithTag(ObjHeader** location, unsigned tag) {
+  MEMORY_LOG("ZeroHeapRef %p\n", location)
+  auto* value = clearPointerBits(*location, tag);
+  if (reinterpret_cast<uintptr_t>(value) > 1) {
+    UPDATE_REF_EVENT(memoryState, value, nullptr, location, 0);
+    *location = nullptr;
+    ReleaseHeapRef(value);
+  }
+}
+
 template<bool Strict>
 void zeroStackRef(ObjHeader** location) {
   MEMORY_LOG("ZeroStackRef %p\n", location)
@@ -1902,8 +1912,7 @@ void updateReturnRef(ObjHeader** returnSlot, const ObjHeader* value) {
   updateStackRef<Strict>(returnSlot, value);
 }
 
-bool updateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) {
-  bool result = true;
+void updateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) {
   if (object != nullptr) {
 #if KONAN_NO_THREADS
     ObjHeader* old = *location;
@@ -1914,6 +1923,27 @@ bool updateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) {
 #else
     addHeapRef(const_cast<ObjHeader*>(object));
     auto old = __sync_val_compare_and_swap(location, nullptr, const_cast<ObjHeader*>(object));
+    if (old != nullptr) {
+      // Failed to store, was not null.
+      ReleaseHeapRef(const_cast<ObjHeader*>(object));
+    }
+#endif
+    UPDATE_REF_EVENT(memoryState, old, object, location, 0);
+  }
+}
+
+bool updateHeapRefIfNullWithTag(ObjHeader** location, const ObjHeader* object, unsigned tag) {
+  bool result = true;
+  if (object != nullptr) {
+#if KONAN_NO_THREADS
+    ObjHeader* old = *location;
+    if (old == nullptr) {
+      addHeapRef(const_cast<ObjHeader*>(object));
+      *const_cast<const ObjHeader**>(location) = object;
+    }
+#else
+    addHeapRef(const_cast<ObjHeader*>(object));
+    auto old = __sync_val_compare_and_swap(location, nullptr, const_cast<ObjHeader*>(setPointerBits(object, tag)));
     if (old != nullptr) {
       // Failed to store, was not null.
       ReleaseHeapRef(const_cast<ObjHeader*>(object));
@@ -2002,6 +2032,8 @@ OBJ_GETTER(initInstance,
 #endif
 }
 
+constexpr unsigned UNINITIALIZED_TAG = 0x1;
+
 template <bool Strict>
 NO_INLINE OBJ_GETTER(doInitSharedInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*)) {
@@ -2031,8 +2063,8 @@ NO_INLINE OBJ_GETTER(doInitSharedInstance,
 #endif  // KONAN_NO_EXCEPTIONS
 #else  // KONAN_NO_THREADS
 retry:
-  ObjHeader* value = *location;
-  if (value != nullptr) {
+  if (*location != nullptr) {
+    ObjHeader* value = clearPointerBits(*location, UNINITIALIZED_TAG);
     // If there's a frozen value already, just return it.
     if (isPermanentOrFrozen(value)) {
       RETURN_OBJ(value);
@@ -2045,7 +2077,7 @@ retry:
     }
 
     // Spin lock.
-    while (*location && !isPermanentOrFrozen(*location)) {}
+    while (*location && !isPermanentOrFrozen(clearPointerBits(*location, UNINITIALIZED_TAG))) {}
 
     // If location has become empty or frozen, just retry the entire procedure.
     goto retry;
@@ -2054,7 +2086,7 @@ retry:
   // Need to create a new instance.
   ObjHeader* object = AllocInstance(typeInfo, OBJ_RESULT);
   // If someone else managed to publish an instance, discard ours, and retry the entire procedure.
-  if (!UpdateHeapRefIfNull(location, object))
+  if (!updateHeapRefIfNullWithTag(location, object, UNINITIALIZED_TAG))
     goto retry;
 
   // Remember that current worker is in charge of initialization.
@@ -2065,6 +2097,7 @@ retry:
   ctor(object);
   if (Strict)
     FreezeSubgraph(object);
+  *location = clearPointerBits(*location, UNINITIALIZED_TAG);
   synchronize();
   // After freezing, we can forget value's initializer.
   memoryState->initializingSingletons.erase(it.first);
@@ -2072,6 +2105,8 @@ retry:
 #else  // KONAN_NO_EXCEPTIONS
   try {
     ctor(object);
+    // TODO: Move after Freeze.
+    *location = clearPointerBits(*location, UNINITIALIZED_TAG);
     if (Strict)
       FreezeSubgraph(object);
     synchronize();
@@ -2080,7 +2115,7 @@ retry:
     return object;
   } catch (...) {
     UpdateReturnRef(OBJ_RESULT, nullptr);
-    zeroHeapRef(location);
+    zeroHeapRefWithTag(location, UNINITIALIZED_TAG);
     synchronize();
     memoryState->initializingSingletons.erase(it.first);
     throw;
@@ -2102,7 +2137,7 @@ ALWAYS_INLINE OBJ_GETTER(initSharedInstance,
 #else  // KONAN_NO_THREADS
   ObjHeader* value = *location;
   // If there's a frozen value already, just return it.
-  if (value != nullptr && (reinterpret_cast<ContainerHeader*>(value) - 1)->frozen()) {
+  if (value != nullptr && (reinterpret_cast<ContainerHeader*>(clearPointerBits(value, UNINITIALIZED_TAG)) - 1)->frozen()) {
       RETURN_OBJ(value);
   }
   RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);
@@ -2902,8 +2937,8 @@ void UpdateReturnRefRelaxed(ObjHeader** returnSlot, const ObjHeader* value) {
   updateReturnRef<false>(returnSlot, value);
 }
 
-bool UpdateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) {
-  return updateHeapRefIfNull(location, object);
+void UpdateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) {
+  updateHeapRefIfNull(location, object);
 }
 
 OBJ_GETTER(SwapHeapRefLocked,
