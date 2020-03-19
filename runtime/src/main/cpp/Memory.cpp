@@ -1850,14 +1850,17 @@ void zeroHeapRef(ObjHeader** location) {
   }
 }
 
-void zeroHeapRefWithTag(ObjHeader** location, unsigned tag) {
-  MEMORY_LOG("ZeroHeapRef %p\n", location)
+void setHeapRefWithTag(ObjHeader** location, const ObjHeader* object, unsigned tag) {
+  MEMORY_LOG("setHeapRefWithTag *%p: %p (%u)\n", location, object, tag)
   auto* value = clearPointerBits(*location, tag);
+  UPDATE_REF_EVENT(memoryState, value, object, location, 0);
+  if (reinterpret_cast<uintptr_t>(object) > 1) {
+    addHeapRef(const_cast<ObjHeader*>(object));
+  }
   if (reinterpret_cast<uintptr_t>(value) > 1) {
-    UPDATE_REF_EVENT(memoryState, value, nullptr, location, 0);
-    *location = nullptr;
     ReleaseHeapRef(value);
   }
+  *const_cast<const ObjHeader**>(location) = object;
 }
 
 template<bool Strict>
@@ -1932,19 +1935,19 @@ void updateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) {
   }
 }
 
-bool updateHeapRefIfNullWithTag(ObjHeader** location, const ObjHeader* object, unsigned tag) {
+bool updateHeapRefAtomicallyWithTag(ObjHeader** location, const ObjHeader* object, const ObjHeader* expected, unsigned tag) {
   bool result = true;
   if (object != nullptr) {
 #if KONAN_NO_THREADS
     ObjHeader* old = *location;
-    if (old == nullptr) {
+    if (old == expected) {
       addHeapRef(const_cast<ObjHeader*>(object));
       *const_cast<const ObjHeader**>(location) = object;
     }
 #else
     addHeapRef(const_cast<ObjHeader*>(object));
-    auto old = __sync_val_compare_and_swap(location, nullptr, const_cast<ObjHeader*>(setPointerBits(object, tag)));
-    if (old != nullptr) {
+    auto old = __sync_val_compare_and_swap(location, const_cast<ObjHeader*>(expected), const_cast<ObjHeader*>(setPointerBits(object, tag)));
+    if (old != expected) {
       // Failed to store, was not null.
       ReleaseHeapRef(const_cast<ObjHeader*>(object));
       result = false;
@@ -2063,12 +2066,11 @@ NO_INLINE OBJ_GETTER(doInitSharedInstance,
 #endif  // KONAN_NO_EXCEPTIONS
 #else  // KONAN_NO_THREADS
 retry:
-  if (*location != nullptr) {
-    if (!hasPointerBits(*location, UNINITIALIZED_TAG)) {
+  if (!hasPointerBits(*location, UNINITIALIZED_TAG)) {
       RETURN_OBJ(*location);
-    }
-    ObjHeader* value = clearPointerBits(*location, UNINITIALIZED_TAG);
-
+  }
+  ObjHeader* value = clearPointerBits(*location, UNINITIALIZED_TAG);
+  if (value != nullptr) {
     // If the value is being initialized by the current worker, just return it.
     auto it = memoryState->initializingSingletons.find(reinterpret_cast<uintptr_t>(value));
     if (it != memoryState->initializingSingletons.end()) {
@@ -2078,9 +2080,9 @@ retry:
     // Spin lock.
     while (true) {
       ObjHeader* value = atomicGet(location);
-      if (value == nullptr)
-        break;
       if (!hasPointerBits(value, UNINITIALIZED_TAG))
+        break;
+      if (clearPointerBits(value, UNINITIALIZED_TAG) == nullptr)
         break;
     }
 
@@ -2091,7 +2093,7 @@ retry:
   // Need to create a new instance.
   ObjHeader* object = AllocInstance(typeInfo, OBJ_RESULT);
   // If someone else managed to publish an instance, discard ours, and retry the entire procedure.
-  if (!updateHeapRefIfNullWithTag(location, object, UNINITIALIZED_TAG))
+  if (!updateHeapRefAtomicallyWithTag(location, object, setPointerBits<ObjHeader>(nullptr, UNINITIALIZED_TAG), UNINITIALIZED_TAG))
     goto retry;
 
   // Remember that current worker is in charge of initialization.
@@ -2119,7 +2121,7 @@ retry:
     return object;
   } catch (...) {
     UpdateReturnRef(OBJ_RESULT, nullptr);
-    zeroHeapRefWithTag(location, UNINITIALIZED_TAG);
+    setHeapRefWithTag(location, setPointerBits<ObjHeader>(nullptr, UNINITIALIZED_TAG), UNINITIALIZED_TAG);
     synchronize();
     memoryState->initializingSingletons.erase(it.first);
     throw;
@@ -2141,7 +2143,7 @@ ALWAYS_INLINE OBJ_GETTER(initSharedInstance,
 #else  // KONAN_NO_THREADS
   ObjHeader* value = *location;
   // If there's a ready value already, just return it.
-  if (value != nullptr && !hasPointerBits(value, UNINITIALIZED_TAG)) {
+  if (!hasPointerBits(value, UNINITIALIZED_TAG)) {
     RETURN_OBJ(value);
   }
   RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);

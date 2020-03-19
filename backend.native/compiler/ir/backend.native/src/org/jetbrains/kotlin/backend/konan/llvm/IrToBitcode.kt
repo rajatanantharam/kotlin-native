@@ -778,9 +778,13 @@ internal class CodeGeneratorVisitor(val context: Context, val lifetimes: Map<IrE
             val singleton = context.llvmDeclarations.forSingleton(declaration)
             val access = singleton.instanceStorage
             if (access is GlobalAddressAccess) {
-                LLVMSetInitializer(access.getAddress(null), if (declaration.storageKind(context) == ObjectStorageKind.PERMANENT)
-                    context.llvm.staticData.createConstKotlinObject(declaration,
-                            *computeFields(declaration)).llvm else codegen.kNullObjHeaderPtr)
+                LLVMSetInitializer(access.getAddress(null),
+                    when (declaration.storageKind(context)) {
+                        ObjectStorageKind.PERMANENT ->
+                            context.llvm.staticData.createConstKotlinObject(declaration, *computeFields(declaration)).llvm
+                        ObjectStorageKind.SHARED -> codegen.kOneObjHeaderPtr
+                        else -> codegen.kNullObjHeaderPtr
+                    })
             }
             val isObjCCompanion = declaration.isCompanion && declaration.parentAsClass.isObjCClass()
             // If can be exported and can be instantiated.

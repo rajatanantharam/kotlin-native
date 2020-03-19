@@ -188,6 +188,8 @@ internal val ContextUtils.kNullObjHeaderPtr: LLVMValueRef
     get() = LLVMConstNull(this.kObjHeaderPtr)!!
 internal val ContextUtils.kNullObjHeaderPtrPtr: LLVMValueRef
     get() = LLVMConstNull(this.kObjHeaderPtrPtr)!!
+internal val ContextUtils.kOneObjHeaderPtr: LLVMValueRef
+    get() = LLVMConstIntToPtr(LLVMConstInt(int8Type, 1, 0), this.kObjHeaderPtr)!!
 
 // Nothing type has no values, but we do generate unreachable code and thus need some fake value:
 internal val ContextUtils.kNothingFakeValue: LLVMValueRef
