@@ -460,11 +460,11 @@ OBJ_GETTER(InitInstanceRelaxed,
 OBJ_GETTER(InitInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
 
-OBJ_GETTER(InitSharedInstanceStrict,
+ALWAYS_INLINE OBJ_GETTER(InitSharedInstanceStrict,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
-OBJ_GETTER(InitSharedInstanceRelaxed,
+ALWAYS_INLINE OBJ_GETTER(InitSharedInstanceRelaxed,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
-OBJ_GETTER(InitSharedInstance,
+ALWAYS_INLINE OBJ_GETTER(InitSharedInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
 
 // Weak reference operations.
