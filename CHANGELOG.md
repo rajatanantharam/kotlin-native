@@ -1,8 +1,12 @@
-# v1.4.0-M1 (Feb 2020)
+# v1.4.0-M1 (Feb 2020) milestone
   * 1.4 Language features
   * Klib versioning
-  * Commonizer support
   * Experimental mimalloc allocator support (-Xallocator=mimalloc) to improve execution time performance
+  * Improveed support for -Xobjc-generics and enabled by default (GH-3778)
+  * Reworked @Throws (GH-3822, GH-3842)
+  * Shared cyclic garbage collector (GH-3742)
+  * Debug improvements
+
 
 # v1.3.70 (Dec 2019)
   * Support compiler caches for debug mode (GH-3650)
