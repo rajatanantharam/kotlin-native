@@ -1,4 +1,4 @@
-# v1.4.0-M1 (Feb 2020) milestone
+# v1.4.0-M1 (Mar 2020) milestone
   * 1.4 Language features
   * Klib versioning
   * Experimental mimalloc allocator support (-Xallocator=mimalloc) to improve execution time performance
