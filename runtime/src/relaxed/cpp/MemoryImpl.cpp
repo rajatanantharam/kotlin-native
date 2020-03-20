@@ -24,7 +24,7 @@ OBJ_GETTER(InitInstance,
   RETURN_RESULT_OF(InitInstanceRelaxed, location, typeInfo, ctor);
 }
 
-ALWAYS_INLINE OBJ_GETTER(InitSharedInstance,
+OBJ_GETTER(InitSharedInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*)) {
   RETURN_RESULT_OF(InitSharedInstanceRelaxed, location, typeInfo, ctor);
 }

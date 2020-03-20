@@ -2038,7 +2038,7 @@ OBJ_GETTER(initInstance,
 constexpr unsigned UNINITIALIZED_TAG = 0x1;
 
 template <bool Strict>
-NO_INLINE OBJ_GETTER(doInitSharedInstance,
+OBJ_GETTER(initSharedInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*)) {
 #if KONAN_NO_THREADS
   ObjHeader* value = *location;
@@ -2127,26 +2127,6 @@ retry:
     throw;
   }
 #endif  // KONAN_NO_EXCEPTIONS
-#endif  // KONAN_NO_THREADS
-}
-
-template <bool Strict>
-ALWAYS_INLINE OBJ_GETTER(initSharedInstance,
-    ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*)) {
-#if KONAN_NO_THREADS
-  ObjHeader* value = *location;
-  // If there's a value already, just return it.
-  if (value != nullptr) {
-      RETURN_OBJ(value);
-  }
-  RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);
-#else  // KONAN_NO_THREADS
-  ObjHeader* value = *location;
-  // If there's a ready value already, just return it.
-  if (!hasPointerBits(value, UNINITIALIZED_TAG)) {
-    RETURN_OBJ(value);
-  }
-  RETURN_RESULT_OF(doInitSharedInstance<Strict>, location, typeInfo, ctor);
 #endif  // KONAN_NO_THREADS
 }
 
@@ -2888,11 +2868,11 @@ OBJ_GETTER(InitInstanceRelaxed,
   RETURN_RESULT_OF(initInstance<false>, location, typeInfo, ctor);
 }
 
-ALWAYS_INLINE OBJ_GETTER(InitSharedInstanceStrict,
+OBJ_GETTER(InitSharedInstanceStrict,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*)) {
   RETURN_RESULT_OF(initSharedInstance<true>, location, typeInfo, ctor);
 }
-ALWAYS_INLINE OBJ_GETTER(InitSharedInstanceRelaxed,
+OBJ_GETTER(InitSharedInstanceRelaxed,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*)) {
   RETURN_RESULT_OF(initSharedInstance<false>, location, typeInfo, ctor);
 }

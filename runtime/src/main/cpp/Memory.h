@@ -460,11 +460,11 @@ OBJ_GETTER(InitInstanceRelaxed,
 OBJ_GETTER(InitInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
 
-ALWAYS_INLINE OBJ_GETTER(InitSharedInstanceStrict,
+OBJ_GETTER(InitSharedInstanceStrict,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
-ALWAYS_INLINE OBJ_GETTER(InitSharedInstanceRelaxed,
+OBJ_GETTER(InitSharedInstanceRelaxed,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
-ALWAYS_INLINE OBJ_GETTER(InitSharedInstance,
+OBJ_GETTER(InitSharedInstance,
     ObjHeader** location, const TypeInfo* typeInfo, void (*ctor)(ObjHeader*));
 
 // Weak reference operations.
@@ -509,7 +509,7 @@ MODEL_VARIANTS(void, UpdateStackRef, ObjHeader** location, const ObjHeader* obje
 // Updates heap/static data location.
 MODEL_VARIANTS(void, UpdateHeapRef, ObjHeader** location, const ObjHeader* object);
 // Updates location if it is null, atomically.
-void UpdateHeapRefIfNull(ObjHeader** location, const ObjHeader* object) RUNTIME_NOTHROW;
+MODEL_VARIANTS(void, UpdateHeapRefIfNull, ObjHeader** location, const ObjHeader* object);
 // Updates reference in return slot.
 MODEL_VARIANTS(void, UpdateReturnRef, ObjHeader** returnSlot, const ObjHeader* object);
 // Compares and swaps reference with taken lock.

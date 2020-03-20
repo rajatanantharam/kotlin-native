@@ -926,7 +926,21 @@ internal class FunctionGenerationContext(val function: LLVMValueRef,
             return loadSlot(instanceAddress.getAddress(this), false)
         }
         val objectPtr = instanceAddress.getAddress(this)
+        val bbInit = basicBlock("label_init", startLocationInfo, endLocationInfo)
+        val bbExit = basicBlock("label_continue", startLocationInfo, endLocationInfo)
+        val objectVal = loadSlot(objectPtr, false)
+        val objectInitialized =
+                if (storageKind == ObjectStorageKind.SHARED && context.config.threadsAreAllowed) {
+                    icmpNe(
+                        and(ptrToInt(objectVal, codegen.intPtrType), codegen.immOneIntPtrType),
+                        codegen.immOneIntPtrType)
+                } else {
+                    icmpUGt(ptrToInt(objectVal, codegen.intPtrType), codegen.immOneIntPtrType)
+                }
+        val bbCurrent = currentBlock
+        condBr(objectInitialized, bbExit, bbInit)
 
+        positionAtEnd(bbInit)
         val typeInfo = codegen.typeInfoForAllocation(irClass)
         val defaultConstructor = irClass.constructors.single { it.valueParameters.size == 0 }
         val ctor = codegen.llvmFunction(defaultConstructor)
@@ -936,9 +950,15 @@ internal class FunctionGenerationContext(val function: LLVMValueRef,
                 } else {
                     context.llvm.initInstanceFunction
                 }
+        val newValue = call(initFunction, listOf(objectPtr, typeInfo, ctor), Lifetime.GLOBAL, exceptionHandler)
+        val bbInitResult = currentBlock
+        br(bbExit)
 
-        // TODO: Inline objectPtr check.
-        return call(initFunction, listOf(objectPtr, typeInfo, ctor), Lifetime.GLOBAL, exceptionHandler)
+        positionAtEnd(bbExit)
+        val valuePhi = phi(codegen.getLLVMType(irClass.defaultType))
+        addPhiIncoming(valuePhi, bbCurrent to objectVal, bbInitResult to newValue)
+
+        return valuePhi
     }
 
     /**
