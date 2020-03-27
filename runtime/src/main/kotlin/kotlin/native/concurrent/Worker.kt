@@ -54,6 +54,7 @@ public inline class Worker @PublishedApi internal constructor(val id: Int) {
          *
          * @param pointer value returned earlier by [Worker.asCPointer]
          */
+        @Deprecated("Use kotlinx.cinterop.StableRef instead", level = DeprecationLevel.WARNING)
         public fun fromCPointer(pointer: COpaquePointer?): Worker =
                 if (pointer != null) Worker(pointer.toLong().toInt()) else throw IllegalArgumentException()
     }
@@ -158,6 +159,7 @@ public inline class Worker @PublishedApi internal constructor(val id: Int) {
      *
      * @return worker identifier as C pointer.
      */
+    @Deprecated("Use kotlinx.cinterop.StableRef instead", level = DeprecationLevel.WARNING)
     public fun asCPointer() : COpaquePointer? = id.toLong().toCPointer()
 }
 
