@@ -48,8 +48,7 @@ class KonanIrLinker(
     private val forwardModuleDescriptor: ModuleDescriptor?,
     exportedDependencies: List<ModuleDescriptor>,
     calculateFakeOverrides: Boolean
-) : KotlinIrLinker(logger, builtIns, symbolTable, exportedDependencies, forwardModuleDescriptor, calculateFakeOverrides, IdSignatureSerializer(KonanManglerIr)
-) {
+) : KotlinIrLinker(logger, builtIns, symbolTable, exportedDependencies, forwardModuleDescriptor, calculateFakeOverrides) {
 
     private val descriptorByIdSignatureFinder = DescriptorByIdSignatureFinder(currentModule)
 

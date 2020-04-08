@@ -271,8 +271,6 @@ internal val psiToIrPhase = konanUnitPhase(
                     (listOf(irModule!!) + deserializer.modules.values)
                             .single { it.descriptor.isNativeStdlib() }
 
-            irProviderForCEnumsAndCStructs.module = module
-
             val fakeOverrideBuilder = FakeOverrideBuilder(symbolTable, IdSignatureSerializer(KonanManglerIr), generatorContext.irBuiltIns)
             deserializer.modules.forEach { _, irModule ->
                 fakeOverrideBuilder.provideFakeOverrides(irModule, {!it.isObjCClass()})
