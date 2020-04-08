@@ -317,5 +317,10 @@ fun ClassDescriptor.getExternalObjCMetaClassBinaryName(): String =
         this.getExplicitExternalObjCClassBinaryName()
                 ?: this.name.asString().removeSuffix("Meta")
 
-private fun ClassDescriptor.getExplicitExternalObjCClassBinaryName() =
-        this.annotations.findAnnotation(externalObjCClassFqName)!!.getStringValueOrNull("binaryName")
+private fun ClassDescriptor.getExplicitExternalObjCClassBinaryName(): String? {
+    println("OBJC: $this")
+    println("OBJC: ${this.annotations}")
+    println("OBJC: ${this.annotations.findAnnotation(externalObjCClassFqName)!!}")
+
+    return this.annotations.findAnnotation(externalObjCClassFqName)!!.getStringValueOrNull("binaryName")
+}

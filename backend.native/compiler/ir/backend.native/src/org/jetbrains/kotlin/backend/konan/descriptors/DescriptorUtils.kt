@@ -6,6 +6,8 @@
 package org.jetbrains.kotlin.backend.konan.descriptors
 
 import org.jetbrains.kotlin.backend.common.atMostOne
+import org.jetbrains.kotlin.backend.common.ir.ir2string
+import org.jetbrains.kotlin.backend.common.serialization.target
 import org.jetbrains.kotlin.backend.konan.*
 import org.jetbrains.kotlin.backend.konan.ir.*
 import org.jetbrains.kotlin.backend.konan.isObjCClass
@@ -39,7 +41,7 @@ internal val IrClass.implementedInterfaces: List<IrClass>
                 superInterfaces).distinct()
     }
 
-
+/*
 /**
  * Implementation of given method.
  *
@@ -80,9 +82,12 @@ internal fun IrSimpleFunction.resolveFakeOverride(allowAbstract: Boolean = false
         realSupers.toList().forEach { excludeOverridden(it) }
     }
 
-    return realSupers.first { allowAbstract || it.modality != Modality.ABSTRACT }
+    return realSupers.firstOrNull { allowAbstract || it.modality != Modality.ABSTRACT }?.also {
+        println("RESOLVE FAKE OVERRIDES (allowAbstract = $allowAbstract) for ${this.render()} returned ${it.render()}")
+    } ?:
+            kotlin.error("no reals for ${ir2string(this)} in $realSupers")
 }
-
+*/
 internal val IrFunction.isTypedIntrinsic: Boolean
     get() = annotations.hasAnnotation(KonanFqNames.typedIntrinsic)
 
@@ -142,16 +147,6 @@ private fun IrFunction.needBridgeToAt(target: IrFunction, index: Int)
 
 internal fun IrFunction.needBridgeTo(target: IrFunction)
         = (0..this.valueParameters.size + 2).any { needBridgeToAt(target, it) }
-
-internal val IrSimpleFunction.target: IrSimpleFunction
-    get() = (if (modality == Modality.ABSTRACT) this else resolveFakeOverride())
-
-internal val IrFunction.target: IrFunction
-    get() = when (this) {
-    is IrSimpleFunction -> this.target
-    is IrConstructor -> this
-    else -> error(this)
-}
 
 internal enum class BridgeDirection {
     NOT_NEEDED,

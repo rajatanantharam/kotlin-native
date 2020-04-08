@@ -4,6 +4,8 @@ import org.jetbrains.kotlin.backend.common.LoggingContext
 import org.jetbrains.kotlin.backend.common.serialization.DeclarationTable
 import org.jetbrains.kotlin.backend.common.serialization.IrFileSerializer
 import org.jetbrains.kotlin.backend.konan.RuntimeNames
+import org.jetbrains.kotlin.backend.konan.isObjCClass
+import org.jetbrains.kotlin.backend.konan.isObjCMetaClass
 import org.jetbrains.kotlin.descriptors.DeclarationDescriptor
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrFunction
@@ -23,4 +25,8 @@ class KonanIrFileSerializer(
 
     override fun backendSpecificExplicitRoot(declaration: IrClass) =
             declaration.annotations.hasAnnotation(RuntimeNames.exportTypeInfoAnnotation)
+
+    override fun backendSpecificFakeOverrideFilter(irClass: IrClass): Boolean {
+        return irClass.isObjCClass() || irClass.isObjCMetaClass()
+    }
 }

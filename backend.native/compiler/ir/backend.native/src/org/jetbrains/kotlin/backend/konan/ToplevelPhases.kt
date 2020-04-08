@@ -4,15 +4,18 @@ import org.jetbrains.kotlin.backend.common.*
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
 import org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension
 import org.jetbrains.kotlin.backend.common.phaser.*
+import org.jetbrains.kotlin.backend.common.serialization.FakeOverrideBuilder
 import org.jetbrains.kotlin.backend.common.serialization.mangle.ManglerChecker
 import org.jetbrains.kotlin.backend.common.serialization.mangle.descriptor.Ir2DescriptorManglerAdapter
 import org.jetbrains.kotlin.backend.common.serialization.metadata.KlibMetadataMonolithicSerializer
+import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureSerializer
 import org.jetbrains.kotlin.backend.konan.descriptors.isForwardDeclarationModule
 import org.jetbrains.kotlin.backend.konan.descriptors.isFromInteropLibrary
 import org.jetbrains.kotlin.backend.konan.descriptors.konanLibrary
 import org.jetbrains.kotlin.backend.konan.ir.interop.IrProviderForInteropStubs
 import org.jetbrains.kotlin.backend.konan.ir.KonanSymbols
 import org.jetbrains.kotlin.backend.konan.ir.interop.IrProviderForCEnumAndCStructStubs
+import org.jetbrains.kotlin.backend.konan.ir.interop.IrProviderForForwardDeclarations
 import org.jetbrains.kotlin.backend.konan.llvm.*
 import org.jetbrains.kotlin.backend.konan.lower.ExpectToActualDefaultValueCopier
 import org.jetbrains.kotlin.backend.konan.objcexport.ObjCExport
@@ -25,11 +28,7 @@ import org.jetbrains.kotlin.descriptors.konan.isNativeStdlib
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.declarations.IrModuleFragment
 import org.jetbrains.kotlin.ir.symbols.IrSymbol
-import org.jetbrains.kotlin.ir.util.DeclarationStubGenerator
-import org.jetbrains.kotlin.ir.util.SymbolTable
-import org.jetbrains.kotlin.ir.util.addChild
-import org.jetbrains.kotlin.ir.util.addFile
-import org.jetbrains.kotlin.ir.util.file
+import org.jetbrains.kotlin.ir.util.*
 import org.jetbrains.kotlin.ir.visitors.acceptVoid
 import org.jetbrains.kotlin.konan.target.CompilerOutputKind
 import org.jetbrains.kotlin.psi2ir.Psi2IrConfiguration
@@ -177,7 +176,8 @@ internal val psiToIrPhase = konanUnitPhase(
                     generatorContext.irBuiltIns,
                     symbolTable,
                     forwardDeclarationsModuleDescriptor,
-                    exportedDependencies
+                    exportedDependencies,
+                    calculateFakeOverrides = config.configuration.getBoolean(CommonConfigurationKeys.CALCULATE_FAKE_OVERRIDES)
             )
 
             var dependenciesCount = 0
@@ -221,12 +221,15 @@ internal val psiToIrPhase = konanUnitPhase(
                     stubGenerator,
                     irProviderForCEnumsAndCStructs::canHandleSymbol
             )
+            val irProviderForForwardDeclarations = IrProviderForForwardDeclarations(stubGenerator)
+
             val irProviders = listOf(
                     irProviderForCEnumsAndCStructs,
                     irProviderForInteropStubs,
                     functionIrClassFactory,
                     deserializer,
-                    stubGenerator
+                    irProviderForForwardDeclarations//,
+                    //stubGenerator
             )
             stubGenerator.setIrProviders(irProviders)
 
@@ -242,12 +245,21 @@ internal val psiToIrPhase = konanUnitPhase(
                 if (mppKlibs) expectDescriptorToSymbol else null
             )
 
+            //symbolTable.allUnbound.let { unbound ->
+                //assert(unbound.isEmpty()) {
+                    //println("Left unbound: ")
+                    //unbound.forEach {
+                      //  println("unbound after linker: $it ${if (it.isPublicApi) it.signature.toString() else "NON-PUBLIC API $it"}")
+                    //}
+                //}
+            //}
+
             deserializer.finalizeExpectActualLinker()
 
             if (this.stdlibModule in modulesWithoutDCE) {
                 functionIrClassFactory.buildAllClasses()
             }
-            module.acceptVoid(ManglerChecker(KonanManglerIr, Ir2DescriptorManglerAdapter(KonanManglerDesc)))
+            // module.acceptVoid(ManglerChecker(KonanManglerIr, Ir2DescriptorManglerAdapter(KonanManglerDesc)))
 
             module.files += irProviderForCEnumsAndCStructs.outputFiles
 
@@ -258,6 +270,27 @@ internal val psiToIrPhase = konanUnitPhase(
             functionIrClassFactory.module =
                     (listOf(irModule!!) + deserializer.modules.values)
                             .single { it.descriptor.isNativeStdlib() }
+
+            irProviderForCEnumsAndCStructs.module = module
+
+            val fakeOverrideBuilder = FakeOverrideBuilder(symbolTable, IdSignatureSerializer(KonanManglerIr), generatorContext.irBuiltIns)
+            deserializer.modules.forEach { _, irModule ->
+                fakeOverrideBuilder.provideFakeOverrides(irModule, {!it.isObjCClass()})
+            }
+            fakeOverrideBuilder.provideFakeOverrides(irModule!!, {!it.isObjCClass()})
+
+            symbolTable.allUnbound.let { unbound ->
+                if (!unbound.isEmpty()) {
+                    println("Unbound after fake override construction: ${unbound.map {if (it.isPublicApi) it.signature.toString() else "NON-PUBLIC API $it"}}")
+                }
+                //assert(unbound.isEmpty()) {
+                //    "Unbound after fale override construction: ${unbound.map {if (it.isPublicApi) it.signature.toString() else "NON-PUBLIC API $it"}}"
+                //}
+            }
+
+            //module.acceptVoid(ManglerChecker(KonanClassicMangler, KonanManglerIr, Ir2DescriptorManglerAdapter(KonanManglerDesc)))
+            module.acceptVoid(ManglerChecker(KonanManglerIr, Ir2DescriptorManglerAdapter(KonanManglerDesc)))
+
         },
         name = "Psi2Ir",
         description = "Psi to IR conversion",

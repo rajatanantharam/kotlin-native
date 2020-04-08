@@ -9,6 +9,7 @@ import kotlinx.cinterop.*
 import llvm.*
 import org.jetbrains.kotlin.backend.common.ir.ir2string
 import org.jetbrains.kotlin.backend.common.lower.inline.InlinerExpressionLocationHint
+import org.jetbrains.kotlin.backend.common.serialization.target
 import org.jetbrains.kotlin.backend.konan.*
 import org.jetbrains.kotlin.backend.konan.descriptors.*
 import org.jetbrains.kotlin.backend.konan.ir.*
@@ -2114,6 +2115,7 @@ internal class CodeGeneratorVisitor(val context: Context, val lifetimes: Map<IrE
             function: IrFunction, args: List<LLVMValueRef>,
             resultLifetime: Lifetime, superClass: IrClass? = null): LLVMValueRef {
         //context.log{"evaluateSimpleFunctionCall : $tmpVariableName = ${ir2string(value)}"}
+        // println("EVALUATE CALL for ${function.render()}:\n\tsuperClass=${superClass?.render()}\n\tisOverridable=${function.isOverridable}")
         if (superClass == null && function is IrSimpleFunction && function.isOverridable)
             return callVirtual(function, args, resultLifetime)
         else

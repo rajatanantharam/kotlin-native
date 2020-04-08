@@ -18,6 +18,7 @@ package org.jetbrains.kotlin.backend.konan.serialization
 
 import org.jetbrains.kotlin.backend.common.LoggingContext
 import org.jetbrains.kotlin.backend.common.serialization.*
+import org.jetbrains.kotlin.backend.common.serialization.signature.IdSignatureSerializer
 import org.jetbrains.kotlin.backend.konan.descriptors.isFromInteropLibrary
 import org.jetbrains.kotlin.backend.konan.descriptors.konanLibrary
 import org.jetbrains.kotlin.descriptors.ClassDescriptor
@@ -45,8 +46,10 @@ class KonanIrLinker(
     builtIns: IrBuiltIns,
     symbolTable: SymbolTable,
     private val forwardModuleDescriptor: ModuleDescriptor?,
-    exportedDependencies: List<ModuleDescriptor>
-) : KotlinIrLinker(logger, builtIns, symbolTable, exportedDependencies, forwardModuleDescriptor) {
+    exportedDependencies: List<ModuleDescriptor>,
+    calculateFakeOverrides: Boolean
+) : KotlinIrLinker(logger, builtIns, symbolTable, exportedDependencies, forwardModuleDescriptor, calculateFakeOverrides, IdSignatureSerializer(KonanManglerIr)
+) {
 
     private val descriptorByIdSignatureFinder = DescriptorByIdSignatureFinder(currentModule)
 

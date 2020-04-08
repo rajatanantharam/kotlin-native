@@ -43,7 +43,8 @@ internal class BuiltInFictitiousFunctionIrClassFactory(
                 error("Module has already been set")
             field = value
             value.files += filesMap.values
-            builtClasses.forEach { it.addFakeOverrides() }
+            //builtClasses.forEach { it.addFakeOverrides() }
+            //builtClasses.forEach { println(ir2stringWhole(it)) }
         }
 
     class FunctionalInterface(val irClass: IrClass, val arity: Int)
