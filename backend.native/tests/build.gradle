@@ -1302,7 +1302,6 @@ linkTest("initializers_linkTest2") {
 }
 
 linkTest("initializers_sharedVarInInitBlock") {
-    goldValue = "42\n"
     source = "codegen/initializers/sharedVarInInitBlock_main.kt"
     lib = "codegen/initializers/sharedVarInInitBlock_lib.kt"
 }

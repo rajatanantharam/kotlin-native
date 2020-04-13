@@ -1,1 +1,3 @@
-fun main() = println(A().x)
+import kotlin.test.*
+
+fun main() = assertEquals(42, (A().x))
