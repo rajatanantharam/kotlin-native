@@ -179,7 +179,8 @@ internal fun runLlvmOptimizationPipeline(context: Context) {
             LLVMAddInternalizePass(modulePasses, 0)
         } else if (context.config.produce == CompilerOutputKind.STATIC_CACHE) {
             // Hidden visibility makes symbols internal when linking the binary.
-            // When producing dynamic library, this enables DCE similar to internalize but later:
+            // When producing dynamic library, this enables stripping unused symbols from binary with -dead_strip flag,
+            // similar to DCE enabled by internalize but later:
             makeVisibilityHiddenLikeLlvmInternalizePass(llvmModule)
             // Important for binary size, workarounds references to undefined symbols from interop libraries.
         }
