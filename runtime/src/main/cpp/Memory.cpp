@@ -16,6 +16,7 @@
 
 #include <string.h>
 #include <stdio.h>
+#include <unistd.h>
 
 #include <cstddef> // for offsetof
 
@@ -1943,6 +1944,7 @@ OBJ_GETTER(allocInstance, const TypeInfo* type_info) {
 #if USE_CYCLIC_GC
   if ((obj->type_info()->flags_ & TF_LEAK_DETECTOR_CANDIDATE) != 0) {
     cyclicAddAtomicRoot(obj);
+    usleep(100 * 1000);
   }
 #endif  // USE_CYCLIC_GC
 #if USE_GC
