@@ -28,6 +28,7 @@
 #include "Natives.h"
 #include "ObjCInterop.h"
 #include "ObjCExportPrivate.h"
+#include "ObjCExportErrors.h"
 #include "Types.h"
 #include "Utils.h"
 
@@ -95,7 +96,16 @@ BOOL _tryRetainImp(id self, SEL _cmd) {
   // this is a regression for instances of Kotlin subclasses of Obj-C classes:
   // loading a reference to such an object from Obj-C weak reference now fails on "wrong" thread
   // unless the object is frozen.
-  return getBackRef(self)->tryAddRef();
+  try {
+    return getBackRef(self)->tryAddRef();
+  }
+  catch (ExceptionObjHolder& e) {
+    // TODO: check for IncorrectDereferenceException and possible weak property access
+    NSLog(@"ERROR: Possible illegal attempt to access weak property from non-owning thread\n"
+                         "is not recoverable and is not propagated from Kotlin to Objective-C/Swift\n"
+                         "Terminating now\n");
+    TerminateWithUnhandledException(e.obj());
+  }
 }
 
 void releaseImp(id self, SEL _cmd) {
