@@ -46,4 +46,9 @@ fun main() {
     canStartReading.value = 1
 
     println(futures.all { it.result })
+
+    for (worker in workers) {
+        worker.requestTermination().result
+    }
+    gcWorker.requestTermination().result
 }
