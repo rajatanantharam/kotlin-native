@@ -1020,6 +1020,12 @@ task atomic0(type: KonanLocalTest) {
     source = "runtime/workers/atomic0.kt"
 }
 
+standaloneTest("atomic1") {
+    enabled = (project.testTarget != 'wasm32') // Workers need pthreads.
+    goldValue = "true\n"
+    source = "runtime/workers/atomic1.kt"
+}
+
 task lazy0(type: KonanLocalTest) {
     enabled = (project.testTarget != 'wasm32') // Workers need pthreads.
     goldValue = "OK\n"

@@ -1,0 +1,49 @@
+/*
+ * Copyright 2010-2020 JetBrains s.r.o. Use of this source code is governed by the Apache 2.0 license
+ * that can be found in the LICENSE file.
+ */
+
+import kotlin.native.concurrent.*
+import kotlin.native.internal.*
+
+val thrashGC = AtomicInt(1)
+val canStartCreating = AtomicInt(0)
+val createdCount = AtomicInt(0)
+val canStartReading = AtomicInt(0)
+const val atomicsCount = 1000
+const val workersCount = 10
+
+fun main() {
+    val gcWorker = Worker.start()
+    val future = gcWorker.execute(TransferMode.SAFE, {}, {
+        canStartCreating.value = 1
+        while (thrashGC.value != 0) {
+            GC.collectCyclic()
+        }
+        GC.collect()
+    })
+
+    while (canStartCreating.value == 0) {}
+
+    val workers = Array(workersCount) { Worker.start() }
+    val futures = workers.map {
+        it.execute(TransferMode.SAFE, {}, {
+            val atomics = Array(atomicsCount) {
+                AtomicReference<Any?>(Any().freeze())
+            }
+            createdCount.increment()
+            while (canStartReading.value == 0) {}
+            GC.collect()
+            atomics.all { it.value != null }
+        })
+    }
+
+    while (createdCount.value != workersCount) {}
+
+    thrashGC.value = 0
+    future.result
+    GC.collect()
+    canStartReading.value = 1
+
+    println(futures.all { it.result })
+}
